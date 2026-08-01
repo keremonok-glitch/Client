@@ -1,0 +1,39 @@
+name: Build MyPvP Client
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Manuel tetikleme butonu ekler
+
+jobs:
+  build:
+    name: Build Tweak
+    runs-on: macos-latest
+
+    steps:
+      - name: 📥 Projeyi Çek (Checkout)
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Theos'u Kur
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+      - name: 📦 iOS SDK'larını Kur
+        run: |
+          curl -LO https://github.com/theos/sdks/archive/master.zip
+          unzip master.zip
+          mv sdks-master/* $HOME/theos/sdks/
+          rm -rf sdks-master master.zip
+
+      - name: ⚙️ Projeyi Derle (Build)
+        run: |
+          make package FINALPACKAGE=1
+        env:
+          THEOS: ${{ env.THEOS }}
+
+      - name: 🚀 DEB Dosyasını Kaydet (Upload Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyPvPClient-Tweak
+          path: packages/*.deb
