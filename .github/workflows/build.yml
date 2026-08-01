@@ -1,9 +1,9 @@
-name: Build MyPvP Client
+name: Build MyPvP Client Dylib
 
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: # Manuel tetikleme butonu ekler
+  workflow_dispatch:
 
 jobs:
   build:
@@ -32,8 +32,8 @@ jobs:
         env:
           THEOS: ${{ env.THEOS }}
 
-      - name: 🚀 DEB Dosyasını Kaydet (Upload Artifact)
+      - name: 🚀 Sadece Dylib Dosyasını Kaydet
         uses: actions/upload-artifact@v4
         with:
-          name: MyPvPClient-Tweak
-          path: packages/*.deb
+          name: MyPvPClient-Dylib
+          path: .theos/obj/**/*.dylib
