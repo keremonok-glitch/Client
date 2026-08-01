@@ -50,13 +50,13 @@
     // İstediğin Başlangıç Renkleri
     self.colorChest   = [UIColor colorWithRed:1.0f green:0.65f blue:0.0f alpha:1.0f];      // Canlı Turuncu
     self.colorEnder   = [UIColor systemPurpleColor];                                       // Mor
-    self.colorShulker = [UIColor systemPinkColor];                                       // Pembe
-    self.colorFurnace = [UIColor darkGrayColor];                                       // Gri
-    self.colorBarrel  = [UIColor colorWithRed:0.9f green:0.75f blue:0.55f alpha:0.7f];    // Soluk Turuncu
-    self.colorHopper  = [UIColor colorWithRed:0.35f green:0.38f blue:0.42f alpha:1.0f];    // Farklı Koyu Gri
+    self.colorShulker = [UIColor systemPinkColor];                                         // Pembe
+    self.colorFurnace = [UIColor darkGrayColor];                                         // Gri
+    self.colorBarrel  = [UIColor colorWithRed:0.9f green:0.75f blue:0.55f alpha:0.7f];     // Soluk Turuncu
+    self.colorHopper  = [UIColor colorWithRed:0.35f green:0.38f blue:0.42f alpha:1.0f];    // Koyu Gri
     self.colorPiston  = [UIColor colorWithRed:0.85f green:0.70f blue:0.55f alpha:1.0f];    // Meşe / Ten Rengi
-    self.colorSticky  = [UIColor systemGreenColor];                                      // Yeşil
-    self.colorSpawner = [UIColor systemRedColor];                                      // Kırmızı
+    self.colorSticky  = [UIColor systemGreenColor];                                        // Yeşil
+    self.colorSpawner = [UIColor systemRedColor];                                          // Kırmızı
     
     // Ana Pencere
     UIView *windowView = [[UIView alloc] initWithFrame:CGRectMake(30, 50, 310, 580)];
@@ -87,9 +87,9 @@
     [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*5), 280, height) title:@"Furnaces [Değiştir]" state:self.filterFurnaces action:@selector(cycleFurnaceColor:)];
     [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*6), 280, height) title:@"Barrels [Değiştir]" state:self.filterBarrels action:@selector(cycleBarrelColor:)];
     [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*7), 280, height) title:@"Hoppers [Değiştir]" state:self.filterHoppers action:@selector(cycleHopperColor:)];
-    [self.createButtonOn:windowView frame:CGRectMake(15, startY + (gap*8), 280, height) title:@"Pistons [Değiştir]" state:self.filterPistons action:@selector(cyclePistonColor:)];
-    [self.createButtonOn:windowView frame:CGRectMake(15, startY + (gap*9), 280, height) title:@"Sticky Pistons [Değiştir]" state:self.filterStickyPistons action:@selector(cycleStickyColor:)];
-    [self.createButtonOn:windowView frame:CGRectMake(15, startY + (gap*10), 280, height) title:@"Spawners [Değiştir]" state:self.filterSpawners action:@selector(cycleSpawnerColor:)];
+    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*8), 280, height) title:@"Pistons [Değiştir]" state:self.filterPistons action:@selector(cyclePistonColor:)];
+    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*9), 280, height) title:@"Sticky Pistons [Değiştir]" state:self.filterStickyPistons action:@selector(cycleStickyColor:)];
+    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*10), 280, height) title:@"Spawners [Değiştir]" state:self.filterSpawners action:@selector(cycleSpawnerColor:)];
     
     self.tracerOverlayView = [[UIView alloc] initWithFrame:self.view.bounds];
     self.tracerOverlayView.backgroundColor = [UIColor clearColor];
@@ -188,13 +188,21 @@
 
 - (void)dealloc {
     [self.displayLink invalidate];
+    [super dealloc];
 }
 
 @end
 
 extern "C" void InitMyPvPMenu() {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *window = [UIApplication sharedApplication].keyWindow;
+        
+        UIWindow *window = nil;
+        
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        window = [UIApplication sharedApplication].keyWindow;
+#pragma clang diagnostic pop
+        
         if (window) {
             StorageESPMenu *menu = [[StorageESPMenu alloc] init];
             menu.view.frame = window.bounds;
