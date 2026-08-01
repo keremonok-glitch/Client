@@ -1,0 +1,9 @@
+Package: com.mypvp.client
+Name: MyPvPClient
+Depends: mobilesubstrate
+Version: 1.0.0
+Architecture: iphone-arm64
+Maintainer: MyPvP
+Author: MyPvP
+Section: Tweaks
+Description: Ultimate 3D Storage ESP & Custom Color GUI for Minecraft.
