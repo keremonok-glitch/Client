@@ -14,6 +14,9 @@ jobs:
       - name: 📥 Projeyi Çek (Checkout)
         uses: actions/checkout@v4
 
+      - name: 🔑 İmzalama Aracını Kur (ldid)
+        run: brew install ldid
+
       - name: 🛠️ Theos'u Kur
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
