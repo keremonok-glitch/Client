@@ -119,7 +119,6 @@
 - (void)showSettingsMenu:(UIButton *__strong)sender {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Better Storage Esp - Ayarlar" message:@"Gelişmiş ESP filtrelerini ve modlarını buradan özelleştirin." preferredStyle:UIAlertControllerStyleActionSheet];
     
-    // Hafıza sızıntısını (Crash) önlemek için zayıf referans oluşturuyoruz
     __weak typeof(self) weakSelf = self;
     
     [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Alpha Değeri: %d (Değiştir)", self.alphaValue] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
@@ -224,7 +223,6 @@
         return;
     }
     
-    // Her frame'de eski çizimleri temizliyoruz
     self.tracerOverlayView.layer.sublayers = nil;
     
     CGPoint crosshairCenter = CGPointMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2);
@@ -269,9 +267,9 @@
     sender.backgroundColor = self.isESPEnabled ? [UIColor colorWithRed:0.25f green:0.18f blue:0.35f alpha:1.0f] : [UIColor colorWithRed:0.15f green:0.15f blue:0.18f alpha:1.0f];
 }
 
+// ARC sisteminde [super dealloc] KULLANILMAZ.
 - (void)dealloc {
     [self.displayLink invalidate];
-    [super dealloc];
 }
 
 @end
