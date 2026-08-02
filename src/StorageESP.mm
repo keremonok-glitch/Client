@@ -193,15 +193,19 @@
 
 @end
 
-extern "C" void InitMyPvPMenu() {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        
+// OYUN AÇILDIĞINDA MENÜYÜ OTOMATİK ÇALIŞTIRAN YAPICI FONKSİYON
+__attribute__((constructor)) static void init() {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
         
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         window = [UIApplication sharedApplication].keyWindow;
 #pragma clang diagnostic pop
+        
+        if (!window) {
+            window = [UIApplication sharedApplication].windows.firstObject;
+        }
         
         if (window) {
             StorageESPMenu *menu = [[StorageESPMenu alloc] init];
