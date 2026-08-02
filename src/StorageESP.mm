@@ -1,9 +1,12 @@
 #import <UIKit/UIKit.h>
-#include <iostream>
+#import <QuartzCore/QuartzCore.h>
 
-@interface StorageESPMenu : UIViewController
+@interface StorageESPMenu : UIViewController <UIPopoverPresentationControllerDelegate>
 @property (nonatomic, assign) BOOL isESPEnabled;
 @property (nonatomic, assign) BOOL isTracerEnabled;
+@property (nonatomic, assign) int alphaValue; // 0 - 255
+@property (nonatomic, assign) int shapeMode;  // 0: Lines, 1: Sides, 2: Both
+
 @property (nonatomic, assign) BOOL filterChests;
 @property (nonatomic, assign) BOOL filterEnderChests;
 @property (nonatomic, assign) BOOL filterShulkers;
@@ -11,21 +14,11 @@
 @property (nonatomic, assign) BOOL filterBarrels;
 @property (nonatomic, assign) BOOL filterHoppers;
 @property (nonatomic, assign) BOOL filterPistons;
-@property (nonatomic, assign) BOOL filterStickyPistons;
+@property (nonatomic, assign) BOOL filterEnchantingTables;
 @property (nonatomic, assign) BOOL filterSpawners;
 
-// Bloklara Ait Dinamik Renk Tutucular (GUI'den Değişir)
-@property (nonatomic, strong) UIColor *colorChest;
-@property (nonatomic, strong) UIColor *colorEnder;
-@property (nonatomic, strong) UIColor *colorShulker;
-@property (nonatomic, strong) UIColor *colorFurnace;
-@property (nonatomic, strong) UIColor *colorBarrel;
-@property (nonatomic, strong) UIColor *colorHopper;
-@property (nonatomic, strong) UIColor *colorPiston;
-@property (nonatomic, strong) UIColor *colorSticky;
-@property (nonatomic, strong) UIColor *colorSpawner;
-
 @property (nonatomic, strong) UIView *tracerOverlayView;
+@property (nonatomic, strong) UIView *mainWindowView;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 @end
 
@@ -34,71 +27,175 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    // Varsayılan Ayarlar & İstediğin Özel Renkler
+    // Başlangıç Ayarları
     self.isESPEnabled = YES;
-    self.isTracerEnabled = NO;
+    self.isTracerEnabled = YES;
+    self.alphaValue = 255;
+    self.shapeMode = 2; // Both
+    
     self.filterChests = YES;
     self.filterEnderChests = YES;
     self.filterShulkers = YES;
-    self.filterFurnaces = NO;   
+    self.filterFurnaces = YES;
     self.filterBarrels = YES;
     self.filterHoppers = YES;
-    self.filterPistons = NO;    
-    self.filterStickyPistons = NO; 
-    self.filterSpawners = YES;  
+    self.filterPistons = YES;
+    self.filterEnchantingTables = YES;
+    self.filterSpawners = YES;
     
-    // İstediğin Başlangıç Renkleri
-    self.colorChest   = [UIColor colorWithRed:1.0f green:0.65f blue:0.0f alpha:1.0f];      // Canlı Turuncu
-    self.colorEnder   = [UIColor systemPurpleColor];                                       // Mor
-    self.colorShulker = [UIColor systemPinkColor];                                         // Pembe
-    self.colorFurnace = [UIColor darkGrayColor];                                         // Gri
-    self.colorBarrel  = [UIColor colorWithRed:0.9f green:0.75f blue:0.55f alpha:0.7f];     // Soluk Turuncu
-    self.colorHopper  = [UIColor colorWithRed:0.35f green:0.38f blue:0.42f alpha:1.0f];    // Koyu Gri
-    self.colorPiston  = [UIColor colorWithRed:0.85f green:0.70f blue:0.55f alpha:1.0f];    // Meşe / Ten Rengi
-    self.colorSticky  = [UIColor systemGreenColor];                                        // Yeşil
-    self.colorSpawner = [UIColor systemRedColor];                                          // Kırmızı
+    // --- 1. KÜÇÜK YUVARLAK YÜZEN BUTON (Açma/Kapama) ---
+    UIButton *floatingBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    floatingBtn.frame = CGRectMake(50, 100, 45, 45);
+    floatingBtn.backgroundColor = [UIColor colorWithRed:0.12f green:0.12f blue:0.14f alpha:0.9f];
+    [floatingBtn setTitle:@"⚡" forState:UIControlStateNormal];
+    floatingBtn.titleLabel.font = [UIFont systemFontOfSize:22];
+    floatingBtn.layer.cornerRadius = 22.5f;
+    floatingBtn.layer.borderWidth = 2.0f;
+    floatingBtn.layer.borderColor = [[UIColor systemPurpleColor] CGColor];
+    [floatingBtn addTarget:self action:@selector(toggleMenuVisibility:) forControlEvents:UIControlEventTouchUpInside];
     
-    // Ana Pencere
-    UIView *windowView = [[UIView alloc] initWithFrame:CGRectMake(30, 50, 310, 580)];
-    windowView.backgroundColor = [UIColor colorWithRed:0.12f green:0.12f blue:0.14f alpha:0.95f];
-    windowView.layer.cornerRadius = 10;
-    windowView.layer.borderWidth = 1.5f;
-    windowView.layer.borderColor = [[UIColor systemPinkColor] CGColor];
-    [self.view addSubview:windowView];
+    UIPanGestureRecognizer *floatPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragFloatingBtn:)];
+    [floatingBtn addGestureRecognizer:floatPan];
+    [self.view addSubview:floatingBtn];
+    
+    // --- 2. ANA PENCERE (GUI) ---
+    self.mainWindowView = [[UIView alloc] initWithFrame:CGRectMake(50, 160, 280, 130)];
+    self.mainWindowView.backgroundColor = [UIColor colorWithRed:0.12f green:0.10f blue:0.16f alpha:0.96f];
+    self.mainWindowView.layer.cornerRadius = 8;
+    self.mainWindowView.layer.borderWidth = 1.5f;
+    self.mainWindowView.layer.borderColor = [[UIColor systemPurpleColor] CGColor];
+    self.mainWindowView.hidden = YES;
+    [self.view addSubview:self.mainWindowView];
     
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragWindow:)];
-    [windowView addGestureRecognizer:pan];
+    [self.mainWindowView addGestureRecognizer:pan];
     
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 280, 25)];
-    title.text = @"⚡ MyPvP | Custom Color GUI ESP";
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(12, 10, 150, 25)];
+    title.text = @"✨ Better Storage Esp";
     title.textColor = [UIColor whiteColor];
-    title.font = [UIFont boldSystemFontOfSize:13];
-    [windowView addSubview:title];
+    title.font = [UIFont boldSystemFontOfSize:12];
+    [self.mainWindowView addSubview:title];
     
-    int startY = 45;
-    int height = 28;
-    int gap = 32;
+    // Ayarlar Butonu (⚙️)
+    UIButton *settingsBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    settingsBtn.frame = CGRectMake(200, 8, 32, 30);
+    [settingsBtn setTitle:@"⚙️" forState:UIControlStateNormal];
+    settingsBtn.titleLabel.font = [UIFont systemFontOfSize:16];
+    [settingsBtn addTarget:self action:@selector(showSettingsMenu:) forControlEvents:UIControlEventTouchUpInside];
+    [self.mainWindowView addSubview:settingsBtn];
     
-    [self createButtonOn:windowView frame:CGRectMake(15, startY, 280, height) title:@"3D Storage ESP" state:self.isESPEnabled action:@selector(toggleESP:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + gap, 280, height) title:@"Tracers (Crosshair)" state:self.isTracerEnabled action:@selector(toggleTracer:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*2), 280, height) title:@"Chests [Değiştir]" state:self.filterChests action:@selector(cycleChestColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*3), 280, height) title:@"Ender Chests [Değiştir]" state:self.filterEnderChests action:@selector(cycleEnderColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*4), 280, height) title:@"Shulker Boxes [Değiştir]" state:self.filterShulkers action:@selector(cycleShulkerColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*5), 280, height) title:@"Furnaces [Değiştir]" state:self.filterFurnaces action:@selector(cycleFurnaceColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*6), 280, height) title:@"Barrels [Değiştir]" state:self.filterBarrels action:@selector(cycleBarrelColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*7), 280, height) title:@"Hoppers [Değiştir]" state:self.filterHoppers action:@selector(cycleHopperColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*8), 280, height) title:@"Pistons [Değiştir]" state:self.filterPistons action:@selector(cyclePistonColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*9), 280, height) title:@"Sticky Pistons [Değiştir]" state:self.filterStickyPistons action:@selector(cycleStickyColor:)];
-    [self createButtonOn:windowView frame:CGRectMake(15, startY + (gap*10), 280, height) title:@"Spawners [Değiştir]" state:self.filterSpawners action:@selector(cycleSpawnerColor:)];
+    // Sağ Üst Kapatma Tuşu ("X")
+    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    closeBtn.frame = CGRectMake(240, 8, 30, 30);
+    [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
+    [closeBtn setTitleColor:[UIColor systemRedColor] forState:UIControlStateNormal];
+    closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [closeBtn addTarget:self action:@selector(closeMenu) forControlEvents:UIControlEventTouchUpInside];
+    [self.mainWindowView addSubview:closeBtn];
     
+    // Ana Ekranda Storage ESP Modülü Toggle Tuşu
+    [self createButtonOn:self.mainWindowView frame:CGRectMake(12, 45, 256, 36) title:@"Storage ESP [Modül]" state:self.isESPEnabled action:@selector(toggleMainESP:)];
+    
+    UILabel *subText = [[UILabel alloc] initWithFrame:CGRectMake(12, 92, 256, 20)];
+    subText.text = @"Ayarlar için sağ üstteki ⚙️ simgesine tıklayın.";
+    subText.textColor = [UIColor lightGrayColor];
+    subText.font = [UIFont systemFontOfSize:9];
+    subText.textAlignment = NSTextAlignmentCenter;
+    [self.mainWindowView addSubview:subText];
+    
+    // Tracer/ESP Çizim Katmanı
     self.tracerOverlayView = [[UIView alloc] initWithFrame:self.view.bounds];
     self.tracerOverlayView.backgroundColor = [UIColor clearColor];
     self.tracerOverlayView.userInteractionEnabled = NO;
     [self.view addSubview:self.tracerOverlayView];
-    [self.view bringSubviewToFront:windowView];
+    [self.view bringSubviewToFront:self.mainWindowView];
     
+    // Çizim Döngüsü
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(updateESPAndTracers)];
     [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+}
+
+// --- ⚙️ AYARLAR MENÜSÜ ---
+- (void)showSettingsMenu:(UIButton *__strong)sender {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Better Storage Esp - Ayarlar" message:@"Gelişmiş ESP filtrelerini ve modlarını buradan özelleştirin." preferredStyle:UIAlertControllerStyleActionSheet];
+    
+    // Hafıza sızıntısını (Crash) önlemek için zayıf referans oluşturuyoruz
+    __weak typeof(self) weakSelf = self;
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Alpha Değeri: %d (Değiştir)", self.alphaValue] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.alphaValue = (weakSelf.alphaValue == 255) ? 120 : (weakSelf.alphaValue == 120) ? 60 : 255;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Tracers: %@", self.isTracerEnabled ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.isTracerEnabled = !weakSelf.isTracerEnabled;
+    }]];
+    
+    NSString *shapeStr = (self.shapeMode == 0) ? @"Lines" : (self.shapeMode == 1) ? @"Sides" : @"Both";
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Shape Mode: %@ (Değiştir)", shapeStr] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.shapeMode = (weakSelf.shapeMode + 1) % 3;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Chests: %@", self.filterChests ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterChests = !weakSelf.filterChests;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Ender Chests: %@", self.filterEnderChests ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterEnderChests = !weakSelf.filterEnderChests;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Shulker Boxes: %@", self.filterShulkers ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterShulkers = !weakSelf.filterShulkers;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Spawners: %@", self.filterSpawners ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterSpawners = !weakSelf.filterSpawners;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Furnaces: %@", self.filterFurnaces ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterFurnaces = !weakSelf.filterFurnaces;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Barrels: %@", self.filterBarrels ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterBarrels = !weakSelf.filterBarrels;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Enchanting Tables: %@", self.filterEnchantingTables ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterEnchantingTables = !weakSelf.filterEnchantingTables;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Pistons: %@", self.filterPistons ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterPistons = !weakSelf.filterPistons;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Hoppers: %@", self.filterHoppers ? @"AÇIK [■]" : @"KAPALI [ ]"] style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.filterHoppers = !weakSelf.filterHoppers;
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"Geri / Kapat" style:UIAlertActionStyleCancel handler:nil]];
+    
+    if (alert.popoverPresentationController) {
+        alert.popoverPresentationController.sourceView = sender;
+        alert.popoverPresentationController.sourceRect = sender.bounds;
+    }
+    
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)toggleMenuVisibility:(UIButton *)sender {
+    self.mainWindowView.hidden = !self.mainWindowView.hidden;
+}
+
+- (void)closeMenu {
+    self.mainWindowView.hidden = YES;
+}
+
+- (void)dragFloatingBtn:(UIPanGestureRecognizer *)gesture {
+    UIView *view = gesture.view;
+    if (!view) return;
+    CGPoint translation = [gesture translationInView:self.view];
+    CGPoint center = view.center;
+    view.center = CGPointMake(center.x + translation.x, center.y + translation.y);
+    [gesture setTranslation:CGPointZero inView:self.view];
 }
 
 - (void)createButtonOn:(UIView *)parent frame:(CGRect)frame title:(NSString *)title state:(BOOL)state action:(SEL)action {
@@ -106,7 +203,7 @@
     btn.frame = frame;
     [btn setTitle:title forState:UIControlStateNormal];
     [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    btn.backgroundColor = state ? [UIColor colorWithRed:0.25f green:0.25f blue:0.28f alpha:1.0f] : [UIColor colorWithRed:0.18f green:0.18f blue:0.20f alpha:1.0f];
+    btn.backgroundColor = state ? [UIColor colorWithRed:0.25f green:0.18f blue:0.35f alpha:1.0f] : [UIColor colorWithRed:0.15f green:0.15f blue:0.18f alpha:1.0f];
     btn.layer.cornerRadius = 6;
     [btn addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     [parent addSubview:btn];
@@ -121,20 +218,37 @@
     [gesture setTranslation:CGPointZero inView:self.view];
 }
 
-// --- 3D ESP VE TRACER ÇİZİM DÖNGÜSÜ ---
 - (void)updateESPAndTracers {
     if (!self.isESPEnabled) {
         self.tracerOverlayView.layer.sublayers = nil;
         return;
     }
+    
+    // Her frame'de eski çizimleri temizliyoruz
     self.tracerOverlayView.layer.sublayers = nil;
     
     CGPoint crosshairCenter = CGPointMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2);
-    
-    CGRect sampleBoxRect = CGRectMake(160, 180, 45, 45);
+    CGRect sampleBoxRect = CGRectMake(160, 180, 45, 45); // Örnek hedef
     
     if (self.filterEnderChests) {
-        [self draw3DBoxAtRect:sampleBoxRect withColor:self.colorEnder];
+        float alphaFloat = (float)self.alphaValue / 255.0f;
+        UIColor *boxColor = [UIColor colorWithRed:0.7f green:0.2f blue:1.0f alpha:alphaFloat];
+        
+        if (self.shapeMode != 0) { // Sides veya Both ise dolgu çiz
+            CAShapeLayer *fillLayer = [CAShapeLayer layer];
+            fillLayer.path = [UIBezierPath bezierPathWithRect:sampleBoxRect].CGPath;
+            fillLayer.fillColor = [boxColor colorWithAlphaComponent:0.2f * alphaFloat].CGColor;
+            [self.tracerOverlayView.layer addSublayer:fillLayer];
+        }
+        
+        if (self.shapeMode != 1) { // Lines veya Both ise çerçeve çiz
+            CAShapeLayer *borderLayer = [CAShapeLayer layer];
+            borderLayer.path = [UIBezierPath bezierPathWithRect:sampleBoxRect].CGPath;
+            borderLayer.strokeColor = boxColor.CGColor;
+            borderLayer.fillColor = [UIColor clearColor].CGColor;
+            borderLayer.lineWidth = 1.2f;
+            [self.tracerOverlayView.layer addSublayer:borderLayer];
+        }
         
         if (self.isTracerEnabled) {
             UIBezierPath *path = [UIBezierPath bezierPath];
@@ -143,47 +257,16 @@
             
             CAShapeLayer *lineLayer = [CAShapeLayer layer];
             lineLayer.path = path.CGPath;
-            lineLayer.strokeColor = [self.colorEnder CGColor];
+            lineLayer.strokeColor = boxColor.CGColor;
             lineLayer.lineWidth = 1.5f;
             [self.tracerOverlayView.layer addSublayer:lineLayer];
         }
     }
 }
 
-// 3D Küp Çizici
-- (void)draw3DBoxAtRect:(CGRect)rect withColor:(UIColor *)color {
-    CAShapeLayer *boxLayer = [CAShapeLayer layer];
-    boxLayer.path = [UIBezierPath bezierPathWithRect:rect].CGPath;
-    boxLayer.strokeColor = [color CGColor];
-    boxLayer.fillColor = [[color colorWithAlphaComponent:0.15f] CGColor];
-    boxLayer.lineWidth = 1.2f;
-    [self.tracerOverlayView.layer addSublayer:boxLayer];
-}
-
-// --- RENK DÖNGÜSÜ METOTLARI ---
-- (UIColor *)nextColorAfter:(UIColor *)current {
-    if (current == [UIColor systemPurpleColor]) return [UIColor systemRedColor];
-    if (current == [UIColor systemRedColor]) return [UIColor systemGreenColor];
-    if (current == [UIColor systemGreenColor]) return [UIColor systemBlueColor];
-    if (current == [UIColor systemBlueColor]) return [UIColor systemYellowColor];
-    return [UIColor systemPurpleColor];
-}
-
-- (void)cycleChestColor:(UIButton *)sender { self.colorChest = [self nextColorAfter:self.colorChest]; }
-- (void)cycleEnderColor:(UIButton *)sender { self.colorEnder = [self nextColorAfter:self.colorEnder]; }
-- (void)cycleShulkerColor:(UIButton *)sender { self.colorShulker = [self nextColorAfter:self.colorShulker]; }
-- (void)cycleFurnaceColor:(UIButton *)sender { self.colorFurnace = [self nextColorAfter:self.colorFurnace]; }
-- (void)cycleBarrelColor:(UIButton *)sender { self.colorBarrel = [self nextColorAfter:self.colorBarrel]; }
-- (void)cycleHopperColor:(UIButton *)sender { self.colorHopper = [self nextColorAfter:self.colorHopper]; }
-- (void)cyclePistonColor:(UIButton *)sender { self.colorPiston = [self nextColorAfter:self.colorPiston]; }
-- (void)cycleStickyColor:(UIButton *)sender { self.colorSticky = [self nextColorAfter:self.colorSticky]; }
-- (void)cycleSpawnerColor:(UIButton *)sender { self.colorSpawner = [self nextColorAfter:self.colorSpawner]; }
-
-- (void)toggleESP:(UIButton *)sender { self.isESPEnabled = !self.isESPEnabled; [self updateBtnStyle:sender state:self.isESPEnabled]; }
-- (void)toggleTracer:(UIButton *)sender { self.isTracerEnabled = !self.isTracerEnabled; [self updateBtnStyle:sender state:self.isTracerEnabled]; }
-
-- (void)updateBtnStyle:(UIButton *)btn state:(BOOL)state {
-    btn.backgroundColor = state ? [UIColor colorWithRed:0.25f green:0.25f blue:0.28f alpha:1.0f] : [UIColor colorWithRed:0.18f green:0.18f blue:0.20f alpha:1.0f];
+- (void)toggleMainESP:(UIButton *)sender {
+    self.isESPEnabled = !self.isESPEnabled;
+    sender.backgroundColor = self.isESPEnabled ? [UIColor colorWithRed:0.25f green:0.18f blue:0.35f alpha:1.0f] : [UIColor colorWithRed:0.15f green:0.15f blue:0.18f alpha:1.0f];
 }
 
 - (void)dealloc {
@@ -193,11 +276,14 @@
 
 @end
 
-// OYUN AÇILDIĞINDA MENÜYÜ OTOMATİK ÇALIŞTIRAN YAPICI FONKSİYON
+// Tekillik ve Crash Önleme Kontrolü
+static BOOL isMenuLoaded = NO;
+
 __attribute__((constructor)) static void init() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIWindow *window = nil;
+        if (isMenuLoaded) return;
         
+        UIWindow *window = nil;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         window = [UIApplication sharedApplication].keyWindow;
@@ -208,6 +294,7 @@ __attribute__((constructor)) static void init() {
         }
         
         if (window) {
+            isMenuLoaded = YES;
             StorageESPMenu *menu = [[StorageESPMenu alloc] init];
             menu.view.frame = window.bounds;
             menu.view.backgroundColor = [UIColor clearColor];
